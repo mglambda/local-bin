@@ -1,0 +1,23 @@
+#!/usr/bin/env python
+import subprocess
+def parseSize(w):
+        return int(w.replace("MiB",""))
+
+ws = subprocess.check_output("nvidia-smi | grep MiB", text=True, shell=True).split("\n")
+for w in ws:
+        vs = list(filter(lambda x: x != "", w.split(" ")))
+        if len(vs) < 2:
+	        continue
+
+        if vs[-2] == "Default":
+                total = vs[-5]
+                used = vs[-7]
+                free = str(parseSize(total) - parseSize(used)) + "MiB"
+                print(f"free: {free}\nused: {used}\ntotal: {total}\n\n--------")
+                continue
+                
+        program_use = vs[-2]
+        program = vs[-3]
+        print(f"{program_use} | {program}")
+
+
