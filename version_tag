@@ -39,7 +39,7 @@ if i == len(lines)-1:
 if args.command == "major":
     newversion = mkVersion(major+1, 0, 0)
 elif args.command == "feature":
-    newversion = mkVersion(major, feature+1, fix)
+    newversion = mkVersion(major, feature+1, 0)
 elif args.command == "fix":
     newversion=mkVersion(major, feature, fix+1)
 else:
