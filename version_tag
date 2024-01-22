@@ -61,6 +61,8 @@ else:
     msg = input(f"Message for tag v{newversion}: ")
       
 # git tag
-gitcmd = f"git tag -a v{newversion} -m '{msg}'"
+gitcmd = f"git tag -a v{newversion} -m \"{msg}\""
+
 subprocess.run("git add " + args.file, text=True, shell=True)
+subprocess.run("git commit -m \"" + msg + "\"", text=True, shell=True)
 subprocess.run(gitcmd, text=True, shell=True)
