@@ -1,0 +1,66 @@
+#!/usr/bin/env python
+
+import os, subprocess, argparse
+
+def parseVersion(w):
+    ns = [int(v) for v in w.split(".")]
+    return (ns[0], ns[1], ns[2])
+
+def mkVersion(major, feature, fix):
+    return ".".join([str(n) for n in [major, feature, fix]])
+
+parser = argparse.ArgumentParser(description="version_tag - Script to git tag python package versions and automatically update setup.py")
+parser.add_argument("command", type=str, default="", help="What version number to increase. May be 'fix', 'feature', or 'major'. This adheres to the semantic versioning scheme of major.feature.fix.")
+parser.add_argument("-m", "--message", type=str, default="", help="Git message to add to the created tag.")
+parser.add_argument("-f", "--file", type=str, default=os.getcwd() + "/setup.py", help="setup.py file to look for an replace version string.")
+parser.add_argument("-n", "--needle", type=str, default="_VERSION", help="String to look for in the setup.py Expects a '=0.3.1' or similar to follow it.")
+	
+args = parser.parse_args()
+
+if not(os.path.isfile(args.file)):
+    print("Could not open " + args.file)
+    quit()
+
+
+lines = open(args.file, "r").read().split("\n")
+for i in range(0, len(lines)):
+    line = lines[i]
+    if args.needle in line:
+        ws = line.split("=")
+        packagename = ws[0]
+        versionstring = eval(ws[1])
+        break
+
+if i == len(lines)-1:
+    print("error: Couldn't find needle.")
+    quit()
+
+(major, feature, fix) = parseVersion(versionstring)
+if args.command == "major":
+    newversion = mkVersion(major+1, 0, 0)
+elif args.command == "feature":
+    newversion = mkVersion(major, feature+1, fix)
+elif args.command == "fix":
+    newversion=mkVersion(major, feature, fix+1)
+else:
+    print("error: No command. Please supply one of 'major', 'feature', or 'fix'")
+    quit()
+
+# do the setup.py
+version_line = f"{packagename}='{newversion}'"
+lines[i] = version_line
+fh = open(args.file, "w")
+fh.write("\n".join(lines))
+fh.flush()
+
+
+# msg
+if args.message != "":
+    msg = args.message
+else:
+    msg = input(f"Message for tag v{newversion}: ")
+      
+# git tag
+gitcmd = f"git tag -a v{newversion} -m '{msg}'"
+subprocess.run("git add " + args.file, text=True, shell=True)
+subprocess.run(gitcmd, text=True, shell=True)
