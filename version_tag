@@ -76,5 +76,7 @@ else:
 gitcmd = f"git tag -a v{newversion} -m \"{msg}\""
 
 subprocess.run("git add " + args.file, text=True, shell=True)
+if os.path.isfile(versionfile):
+    subprocess.run("git add " + versionfile, text=True, shell=True)    
 subprocess.run("git commit -m \"" + msg + "\"", text=True, shell=True)
 subprocess.run(gitcmd, text=True, shell=True)
