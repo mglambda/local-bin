@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-
-import os, subprocess, argparse
+import os, subprocess, argparse, sys
 
 def parseVersion(w):
     ns = [int(v) for v in w.split(".")]
@@ -10,7 +9,7 @@ def mkVersion(major, feature, fix):
     return ".".join([str(n) for n in [major, feature, fix]])
 
 parser = argparse.ArgumentParser(description="version_tag - Script to git tag python package versions and automatically update setup.py")
-parser.add_argument("command", type=str, default="", help="What version number to increase. May be 'fix', 'feature', or 'major'. This adheres to the semantic versioning scheme of major.feature.fix.")
+parser.add_argument("command", type=str, default="", help="What version number to increase. pMay be 'fix', 'feature', or 'major'. This adheres to the semantic versioning scheme of major.feature.fix.")
 parser.add_argument("-m", "--message", type=str, default="", help="Git message to add to the created tag.")
 parser.add_argument("-f", "--file", type=str, default=os.getcwd() + "/setup.py", help="setup.py file to look for an replace version string.")
 parser.add_argument("-n", "--needle", type=str, default="_VERSION", help="String to look for in the setup.py Expects a '=0.3.1' or similar to follow it.")
@@ -52,6 +51,19 @@ lines[i] = version_line
 fh = open(args.file, "w")
 fh.write("\n".join(lines))
 fh.flush()
+
+# __VERSION__
+# place a file with version string into package directory
+# the attempt to find the package dir is a heuristic
+dirname = os.path.join(os.getcwd(), packagename.replace(args.needle, "").lower())
+versionfile = os.path.join(dirname, "__VERSION__")    
+if os.path.isdir(dirname):
+    vf = open(versionfile, "w")
+    vf.write(newversion)
+    vf.close()
+else:
+    print("warning: Could not write version to " + versionfile, file=sys.stderr)
+
 
 
 # msg
