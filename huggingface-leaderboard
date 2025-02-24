@@ -1,0 +1,151 @@
+#!/usr/bin/env python
+import os
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+import json
+import re
+
+def set_working_directory():
+    cwd = os.getcwd()
+    return cwd
+
+def dir_create_csv(cwd):
+    csv_dir = os.path.join(cwd, "csv")
+    os.makedirs(csv_dir, exist_ok=True)
+
+def json_from_html(url):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+    script = soup.find_all('script')[1]
+    json_str = script.string
+    json_str = re.sub(r'^window\.gradio_config = ', '', json_str)
+    json_str = re.sub(r';$', '', json_str)
+    if len(json_str) > 10000:
+        return json.loads(json_str)
+    else:
+        raise ValueError("JSON string is too short")
+
+def find_column_index(json_data, column_name):
+    for component in json_data['components']:
+        props = component['props']
+        if "headers" not in props:
+            continue
+        headers = props['headers']
+        for idx, header in enumerate(headers):
+            if column_name in header:
+                return idx
+    return -1
+
+def dt_from_json_index(json_data, idx):
+    data = json_data['components']['props']['value'][idx]['data']
+    return pd.DataFrame(data)
+
+def model_name_and_url(model):
+    response = requests.get(model)
+    soup = BeautifulSoup(response.content, 'html.parser')
+    a_tag = soup.find('a')
+    model_name = a_tag.get_text()
+    url = a_tag['href']
+    return {'model': model_name, 'url': url}
+
+def add_model_url_columns(df):
+    df['model'] = df['model'].apply(lambda x: model_name_and_url(x)['model'])
+    df['url'] = df['model'].apply(lambda x: model_name_and_url(x)['url'])
+    return df
+
+def set_column_class(df, asclass):
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            try:
+                df[col] = df[col].apply(asclass)
+            except ValueError:
+                pass
+    return df
+
+def set_dt_classes(df):
+    df = set_column_class(df, pd.to_numeric)
+    df = set_column_class(df, pd.to_numeric)
+    return df
+
+def dt_from_json(json_data, fn, column):
+    idx = find_column_index(json_data, column)
+    headers = fn(json_data, idx)
+    df = dt_from_json_index(json_data, idx)
+    df.columns = headers
+    df = add_model_url_columns(df)
+    df = set_dt_classes(df)
+    return df
+
+def dt_from_json_v2(json_data):
+    df = pd.DataFrame(json_data)
+    df.columns = [re.sub(r'\.', '_', col) for col in df.columns]
+    return df
+
+def normalize_json_headers_hg(json_data, idx):
+    #headers = json_data['components']['props']['value'][idx]['headers']
+    for component in json_data['components']:
+        props = component['props']
+        if "value" not in props:
+            continue
+        value = props['value']
+        if type(value) != type({}) or idx not in value:
+            continue
+        headers = value[idx]['headers']
+        headers = [re.sub(r'Average ⬆️', 'Average', header) for header in headers]
+        headers = [re.sub(r'Hub ❤️', 'Hub Hearts', header) for header in headers]
+        headers = [re.sub(r'\W', '', header.replace(' ', '_')).lower() for header in headers]
+        return headers
+
+def normalize_json_headers_lm(json_data, idx):
+    headers = json_data['components']['props']['value'][idx]['headers']
+    headers = [re.sub(r'\W+', ' ', header).strip() for header in headers]
+    headers = [re.sub(r'Rank UB', 'Rank', header) for header in headers]
+    headers = [re.sub(r'95 CI', '95 Pct CI', header) for header in headers]
+    headers = [re.sub(r'\W', '', header.replace(' ', '_')).lower() for header in headers]
+    return headers
+
+def dt_from_html_hg(url):
+    json_data = json_from_html(url)
+    return dt_from_json(json_data, normalize_json_headers_hg, 'Hub ❤️')
+
+def dt_from_api_hg_v2(url):
+    response = requests.get(url)
+    json_data = response.json()
+    return dt_from_json_v2(json_data)
+
+def dt_from_html_lm(url):
+    json_data = json_from_html(url)
+    return dt_from_json(json_data, normalize_json_headers_lm, 'Knowledge Cutoff')
+
+def dt_merge_tables(df1, df2):
+    df1['key'] = df1['model_name'].str.lower().str.split('/').str[1]
+    df2['key'] = df2['model'].str.lower()
+    return pd.merge(df1, df2, on='key')
+
+def dt_if_missing(file, fn, *args):
+    csv_path = os.path.join("csv", file)
+    if os.path.exists(csv_path):
+        df = pd.read_csv(csv_path)
+    else:
+        df = fn(*args)
+        df.to_csv(csv_path, index=False)
+    return df
+
+cwd = set_working_directory()
+dir_create_csv(cwd)
+
+url = "https://open-llm-leaderboard-old-open-llm-leaderboard.hf.space/"
+file = "huggingface_v1.csv"
+hg1 = dt_if_missing(file, dt_from_html_hg, url)
+
+url = "https://lmarena-ai-chatbot-arena-leaderboard.hf.space/"
+file = "lmsys.csv"
+lmsys = dt_if_missing(file, dt_from_html_lm, url)
+
+url = "https://open-llm-leaderboard-open-llm-leaderboard.hf.space/api/leaderboard/formatted"
+file = "huggingface_v2.csv"
+hg2 = dt_if_missing(file, dt_from_api_hg_v2, url)
+
+file = "merged.csv"
+merged = dt_if_missing(file, dt_merge_tables, hg2, lmsys)
