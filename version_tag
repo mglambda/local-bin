@@ -8,14 +8,21 @@ def parseVersion(w):
 def mkVersion(major, feature, fix):
     return ".".join([str(n) for n in [major, feature, fix]])
 
-parser = argparse.ArgumentParser(description="version_tag - Script to git tag python package versions and automatically update setup.py")
+parser = argparse.ArgumentParser(description="version_tag - Script to git tag python package versions and automatically update setup.py/pyproject.toml")
 parser.add_argument("command", type=str, default="", help="What version number to increase. pMay be 'fix', 'feature', or 'major'. This adheres to the semantic versioning scheme of major.feature.fix.")
 parser.add_argument("-m", "--message", type=str, default="", help="Git message to add to the created tag.")
-parser.add_argument("-f", "--file", type=str, default=os.getcwd() + "/setup.py", help="setup.py file to look for an replace version string.")
-parser.add_argument("-n", "--needle", type=str, default="_VERSION", help="String to look for in the setup.py Expects a '=0.3.1' or similar to follow it.")
+parser.add_argument("-f", "--file", type=str, default="", help="setup.py file to look for an replace version string. Default is to try first pyrpoject.toml, then setup.py, then fail.")
+parser.add_argument("-n", "--needle", type=str, default="version", help="String to look for in the setup.py Expects a '=0.3.1' or similar to follow it.")
 	
 args = parser.parse_args()
 
+if args.file == "":
+    candidates = "pyproject.toml setup.py".split(" ")
+    for f in candidates:
+        if os.path.isfile(os.getcwd() + "/" + f):
+            args.file = f
+            break
+            
 if not(os.path.isfile(args.file)):
     print("Could not open " + args.file)
     quit()
@@ -23,11 +30,15 @@ if not(os.path.isfile(args.file)):
 
 lines = open(args.file, "r").read().split("\n")
 for i in range(0, len(lines)):
-    line = lines[i]
+    line = lines[i]    
+    if line.startswith("name"):
+        ws = line.split("=")
+        packagename = eval(ws[1].strip())
+
     if args.needle in line:
         ws = line.split("=")
-        packagename = ws[0]
-        versionstring = eval(ws[1])
+        versionstring = eval(ws[1].strip())
+        # breaking here is important as we use the i later
         break
 
 if i == len(lines)-1:
@@ -45,8 +56,11 @@ else:
     print("error: No command. Please supply one of 'major', 'feature', or 'fix'")
     quit()
 
-# do the setup.py
-version_line = f"{packagename}='{newversion}'"
+# do the pyproject.toml/setup.py
+if args.file.endswith("toml"):
+    version_line = f"version = '{newversion}'"
+    else:
+        version_line = f"{packagename}='{newversion}'"
 lines[i] = version_line
 fh = open(args.file, "w")
 fh.write("\n".join(lines))
