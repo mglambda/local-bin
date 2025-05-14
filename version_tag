@@ -59,8 +59,8 @@ else:
 # do the pyproject.toml/setup.py
 if args.file.endswith("toml"):
     version_line = f"version = '{newversion}'"
-    else:
-        version_line = f"{packagename}='{newversion}'"
+else:
+    version_line = f"{packagename}='{newversion}'"
 lines[i] = version_line
 fh = open(args.file, "w")
 fh.write("\n".join(lines))

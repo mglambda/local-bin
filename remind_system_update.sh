@@ -1,4 +1,9 @@
 #!/bin/bash
+# This will remind the user every 3 hours of a system update, if the update islonger than THRESHOLD days ago.
+# This works in conjunction with system_update.sh which will place logs in ~/etc/updates
+#
+# Use the following to add this to your crontab
+# (crontab -l 2>/dev/null; echo "0 */3 * * * /home/marius/.local/bin/remind_system_update.sh") | crontab -
 
 # Define threshold for update reminder (in days)
 THRESHOLD=14  # Change this value as needed
