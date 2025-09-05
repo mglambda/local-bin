@@ -8,23 +8,27 @@ def replace_some(extension):
     return replacements.get(extension, extension)
 
     
-def print_file_contents(file_path):
+def print_file_contents(file_path, replace=True):
     try:
-        with open(file_path, 'r') as file:
-            contents = file.read()
-            filename = file_path.split('/')[-1]
-            extension = filename.split('.')[-1]
-            if extension == filename:
-                extension = ""
+        if replace:
+            with open(file_path, 'r') as file:
+                contents = file.read()
+        filename = file_path.split('/')[-1]
+        extension = filename.split('.')[-1]
+        if extension == filename:
+            extension = ""
+
                 
+        # Print the header
+        print(f"## {filename}")
+        print(f"\n```{replace_some(extension)}")
 
-            # Print the header
-            print(f"## {filename}")
-            print(f"\n```{replace_some(extension)}")
-
+        if replace:
             # Print the actual content of the file
             print(contents)
-            print("```\n")
+        else:
+            print("{[" + file_path + "]}")
+        print("```\n")
     except FileNotFoundError:
         print(f"File not found: {file_path}", file=sys.stderr)
     except Exception as e:
@@ -32,11 +36,16 @@ def print_file_contents(file_path):
 
 def main():
     if len(sys.argv) < 2:
-        print("Gather and quote files for use in LLM prompts.\nUsage: python script.py file1 file2 ...")
+        print("Gather and quote files for use in LLM prompts.\nUsage: python script.py [-r] file1 file2 ...\n Use -r to do full text replacement. The default is to use dynamic fiel vars e.g. {[file1.txt]}")
         return
 
+    replace = False
+    if sys.argv[1] == "-r":
+        replace = True
+        del sys.argv[1]
+        
     for arg in sys.argv[1:]:
-        print_file_contents(arg)
+        print_file_contents(arg, replace=replace)
 
 if __name__ == "__main__":
     main()
