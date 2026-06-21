@@ -1,0 +1,43 @@
+#!/bin/bash
+# Small startup script to initiate a gdm session with wayland in a screenreader-enabled environment
+# or as gemini putit "A monument to our collective suffering."
+
+# 0. The Vibe Check
+# Cache your sudo password FIRST while your screen reader is still alive.
+# If you fail this, the script dies so you don't get trapped in silence.
+sudo -v || exit 1
+
+# 1. Kill the kernel reader
+sudo systemctl stop espeakup
+
+# 2. Resurrect the Pipewire trash fire (as your user, obviously)
+systemctl --user restart pipewire wireplumber
+
+# Give the audio server a second to stop crying and wake up
+sleep 2
+
+# 3. Test it. Use -w so the script actually WAITS for it to finish speaking.
+spd-say -w "Pipewire restarted successfully."
+
+# 4. Summon the GNOME demon
+sudo systemctl start gdm
+
+# 5. Wait for the bloated mess to load
+sleep 5
+
+# 6. Hunt down the TTY. 
+# The greeter runs under the 'gdm' user. Grab the TTY of its gnome-shell.
+GDM_TTY=$(ps -u gdm -ho tty,comm | grep -m 1 gnome-shell | awk '{print $1}')
+
+# Fallback just in case GNOME is being extra miserable today and already switched users
+if [ -z "$GDM_TTY" ]; then
+    GDM_TTY=$(ps -eo tty,comm | grep -m 1 '[g]nome-shell' | awk '{print $1}')
+fi
+
+# 7. Announce the damage
+if [ -n "$GDM_TTY" ]; then
+    # Usually outputs something like 'tty2', spd-say will just spell it out.
+    spd-say -w "Greeter is on $GDM_TTY"
+else
+    spd-say -w "It broke. Have fun in the void."
+fi
